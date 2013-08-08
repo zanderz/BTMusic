@@ -49,8 +49,7 @@ END_MESSAGE_MAP()
 
 CMusicApp1Dlg::CMusicApp1Dlg(CWnd* pParent /*=NULL*/)
 	: CDialogEx(CMusicApp1Dlg::IDD, pParent)
-	, m_Email(_T(""))
-	, m_phone(_T(""))
+	, m_Email(_T(""))	
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 }
@@ -58,8 +57,7 @@ CMusicApp1Dlg::CMusicApp1Dlg(CWnd* pParent /*=NULL*/)
 void CMusicApp1Dlg::DoDataExchange(CDataExchange* pDX)
 {
 	CDialogEx::DoDataExchange(pDX);
-	DDX_Text(pDX, IDC_EMAIL, m_Email);
-	DDX_Text(pDX, IDC_PHONE, m_phone);
+	DDX_Text(pDX, IDC_EMAIL, m_Email);	
 }
 
 BEGIN_MESSAGE_MAP(CMusicApp1Dlg, CDialogEx)
@@ -67,8 +65,7 @@ BEGIN_MESSAGE_MAP(CMusicApp1Dlg, CDialogEx)
 	ON_WM_PAINT()
 	ON_WM_QUERYDRAGICON()
 	ON_NOTIFY(NM_CUSTOMDRAW, IDC_PROGRESS1, &CMusicApp1Dlg::OnNMCustomdrawProgress1)
-	ON_EN_CHANGE(IDC_EMAIL, &CMusicApp1Dlg::OnEnChangeEmail)
-	ON_EN_CHANGE(IDC_PHONE, &CMusicApp1Dlg::OnEnChangePhone)
+	ON_EN_CHANGE(IDC_EMAIL, &CMusicApp1Dlg::OnEnChangeEmail)	
 	ON_BN_CLICKED(IDC_MYOK, &CMusicApp1Dlg::OnBnClickedMyok)
 END_MESSAGE_MAP()
 
@@ -177,22 +174,9 @@ void CMusicApp1Dlg::OnEnChangeEmail()
 	// with the ENM_CHANGE flag ORed into the mask.
 
 	UpdateData(TRUE);
-	if(m_phone.GetLength() && m_Email.GetLength())
+	if(m_Email.GetLength())
 		GetDlgItem(IDC_MYOK)->EnableWindow();
 }
-
-
-void CMusicApp1Dlg::OnEnChangePhone()
-{
-	// TODO:  If this is a RICHEDIT control, the control will not
-	// send this notification unless you override the CDialogEx::OnInitDialog()
-	// function and call CRichEditCtrl().SetEventMask()
-	// with the ENM_CHANGE flag ORed into the mask.
-	UpdateData(TRUE);
-	if(m_phone.GetLength() && m_Email.GetLength())
-		GetDlgItem(IDC_MYOK)->EnableWindow();	
-}
-
 
 
 

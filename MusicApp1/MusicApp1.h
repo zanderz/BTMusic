@@ -19,13 +19,13 @@ class CMusicApp1App : public CWinApp
 {
 public:
 	CMusicApp1App();
-
+	
 // Overrides
 public:
 	virtual BOOL InitInstance();
 
 // Implementation
-
+	CInternetSession  m_internetSession;
 	DECLARE_MESSAGE_MAP()
 };
 

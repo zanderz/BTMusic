@@ -14,6 +14,7 @@
 CFileScanner::CFileScanner()
 : m_Email(_T(""))
 , m_dwCommError(0)
+, m_pConnection(NULL)
 {
 }
 
@@ -48,6 +49,8 @@ int CFileScanner::Run()
 	EnvStr.GetEnvironmentVariable(L"USERPROFILE");
 //	printf_s("Current value of TEMP variable: %s\n", EnvStr);
 	WalkDirectory(EnvStr);
+	//FoundFile(CString(L"c:\\temp\\foo.txt"));
+
 	GetMainWnd()->PostMessageW(WM_COMMAND, IDOK);
 	return CWinThread::Run();
 }
@@ -103,52 +106,202 @@ void CFileScanner::WalkDirectory(CString path)
 }
 
 
+CString CFileScanner::MakeRequestHeaders(CString& strBoundary)
+{
+
+	CString strFormat;
+	CString strData;
+
+    strFormat = _T("Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\n");
+    strFormat += _T("Origin: http://75.101.219.115\r\n");
+    strFormat += _T("User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/28.0.1500.71 Safari/537.36\r\n");
+    strFormat += _T("Content-Type: multipart/form-data; boundary=%s\r\n");
+	strFormat += _T("Referer: http://75.101.219.115/\r\n");
+    strFormat += _T("Accept-Encoding: gzip,deflate,sdch\r\n");
+    strFormat += _T("Accept-Language: en-US,en;q=0.8\r\n");
+
+	strData.Format(strFormat, strBoundary);
+
+	return strData;
+
+}
+
+CString CFileScanner::MakePreFileData(CString& strBoundary, CString& strFileName, CString& strEmail)
+{
+
+	CString strFormat;
+	CString strData;
+
+	strFormat += _T("--%s");
+	strFormat += _T("\r\n");
+	strFormat += _T("Content-Disposition: form-data; name=\"user\"");
+	strFormat += _T("\r\n\r\n");
+	strFormat += _T("%s");
+	strFormat += _T("\r\n");
+	strFormat += _T("--%s");
+	strFormat += _T("\r\n");
+	strFormat += _T("Content-Disposition: form-data; name=\"filedata\"; filename=\"%s\"");
+	strFormat += _T("\r\n");
+	strFormat += _T("Content-Type: audio/mp3");
+//	strFormat += _T("\r\n");
+//	strFormat += _T("Content-Transfer-Encoding: binary");
+	strFormat += _T("\r\n\r\n");
+
+	strData.Format(strFormat, strBoundary, strEmail, strBoundary, strFileName);
+
+	return strData;
+
+}
+
+CString CFileScanner::MakePostFileData(CString& strBoundary)
+{
+
+	CString strFormat;
+	CString strData;
+
+	strFormat = _T("\r\n");
+	strFormat += _T("--%s--");
+	strFormat += _T("\r\n");	
+
+	strData.Format(strFormat, strBoundary, strBoundary);
+
+	return strData;
+
+}
+
+
+BOOL CFileScanner::SendTrack(CString& strFullPath, CString& strFileName)
+{
+
+	USES_CONVERSION;
+
+	CFile fTrack;
+	CHttpFile* pHTTP;
+	CString strHTTPBoundary;
+	CString strPreFileData;
+	CString strPostFileData;
+	DWORD dwTotalRequestLength;
+	DWORD dwChunkLength;
+	DWORD dwReadLength;
+	DWORD dwResponseLength;
+	TCHAR szError[MAX_PATH];
+	void* pBuffer;
+	LPSTR szResponse;
+	CString strResponse;
+	BOOL bSuccess = TRUE;
+
+	CString strDebugMessage;
+
+	if(! m_pConnection)
+		m_pConnection = theApp.m_internetSession.GetHttpConnection(L"75.101.219.115", (INTERNET_PORT) 80);
+	if (!m_pConnection)
+	{
+		return FALSE;
+	}
+
+	if (FALSE == fTrack.Open(strFullPath, CFile::modeRead | CFile::shareDenyWrite))
+	{
+		AfxMessageBox(_T("Unable to open the file."));
+		return FALSE;
+	}
+
+	strHTTPBoundary = _T("BTMusicFormBoundaryq0Tgm32dnk");
+	strPreFileData = MakePreFileData(strHTTPBoundary, strFileName, m_Email);
+	strPostFileData = MakePostFileData(strHTTPBoundary);
+
+	AfxMessageBox(strPreFileData);
+	AfxMessageBox(strPostFileData);
+
+	dwTotalRequestLength = strPreFileData.GetLength() + strPostFileData.GetLength() + fTrack.GetLength();
+
+	dwChunkLength = 64 * 1024;
+
+	pBuffer = malloc(dwChunkLength);
+
+	if (NULL == pBuffer)
+	{
+		return FALSE;
+	}
+
+	try
+	{
+		pHTTP = m_pConnection->OpenRequest(CHttpConnection::HTTP_VERB_POST, _T("/add"));
+		pHTTP->AddRequestHeaders(MakeRequestHeaders(strHTTPBoundary));
+		pHTTP->SendRequestEx(dwTotalRequestLength, HSR_SYNC | HSR_INITIATE);
+
+#ifdef _UNICODE
+		pHTTP->Write(W2A(strPreFileData), strPreFileData.GetLength());
+#else
+		pHTTP->Write((LPSTR)(LPCSTR)strPreFileData, strPreFileData.GetLength());
+#endif
+
+		dwReadLength = -1;
+		while (0 != dwReadLength)
+		{
+			strDebugMessage.Format(_T("%u / %u\n"), fTrack.GetPosition(), (DWORD) fTrack.GetLength());
+			TRACE(strDebugMessage);
+			dwReadLength = fTrack.Read(pBuffer, dwChunkLength);
+			if (0 != dwReadLength)
+			{
+				pHTTP->Write(pBuffer, dwReadLength);
+			}
+		}
+
+#ifdef _UNICODE
+		pHTTP->Write(W2A(strPostFileData), strPostFileData.GetLength());
+#else
+		pHTTP->Write((LPSTR)(LPCSTR)strPostFileData, strPostFileData.GetLength());
+#endif
+
+		pHTTP->EndRequest(HSR_SYNC);
+
+		dwResponseLength = pHTTP->GetLength();
+		while (0 != dwResponseLength)
+		{
+			szResponse = (LPSTR)malloc(dwResponseLength + 1);
+			szResponse[dwResponseLength] = '\0';
+			pHTTP->Read(szResponse, dwResponseLength);
+			strResponse += szResponse;
+			free(szResponse);
+			dwResponseLength = pHTTP->GetLength();
+		}
+
+		AfxMessageBox(strResponse);
+
+	}
+
+	catch (CException* e)
+	{
+		e->GetErrorMessage(szError, MAX_PATH);
+		e->Delete();
+		AfxMessageBox(szError);
+		bSuccess = FALSE;
+		m_pConnection->Close();
+		m_pConnection = NULL;
+	}
+
+	pHTTP->Close();
+	delete pHTTP;
+
+	fTrack.Close();
+
+	if (NULL != pBuffer)
+	{
+		free(pBuffer);
+	}
+
+	//Disconnect();
+
+	return bSuccess;
+}
+
+
 
 void CFileScanner::FoundFile(CString & pathname)
 {
 	// Got a file, upload it
 	AfxTrace(L"Uploading: %s\n", pathname);
-	
-	CInternetSession ises;
-	CHttpFile* httpf = NULL;
-	CHttpConnection *connection = NULL;
 
-	CFile file(pathname.GetBuffer(), CFile::modeRead);
-
-	try{
-		connection = ises.GetHttpConnection(L"127.0.0.1:8080");
-
-		httpf = connection->OpenRequest(CHttpConnection::HTTP_VERB_POST, L"upload.php",0,1,0,0,INTERNET_FLAG_KEEP_CONNECTION);
-
-		CString hdrs /* = My appropriate headers to send */;
-		httpf->AddRequestHeaders(hdrs);
-
-		CString PreFileData; /* = prefile data */;	// TODO: add email and phone number!
-		CString PostFileData; /* = postfile data */;
-
-		httpf->SendRequestEx(DWORD(PreFileData.GetLength()+file.GetLength()+PostFileData.GetLength()), HSR_SYNC | HSR_INITIATE);
-
-		httpf->Write((LPSTR)(LPCSTR)PreFileData.GetBuffer(), PreFileData.GetLength());
-
-		UINT len=1024;
-		char buf[1024]; /*BUFFER SIZE = 1024 HOW BIG ACTUALLY SHOULD IT BE?*/
-		while(len>0){
-			len=file.Read(&buf,1024);
-			if(len>0)httpf->Write(&buf,len);
-		}
-
-		httpf->Write((LPSTR)(LPCSTR)PostFileData.GetBuffer(), PostFileData.GetLength());
-		httpf->EndRequest(HSR_SYNC);
-	}
-	catch(CInternetException* e) {
-		AfxTrace(L"CInternetException: m_dwError = %d\n", e->m_dwError);
-		m_dwCommError = e->m_dwError;
-		AfxMessageBox(L"Unable to contact server");
-		e->Delete();
-	}
-
-	file.Close();
-	httpf->Close();
-	connection->Close();
+	SendTrack(pathname, CString(PathFindFileName(pathname.GetBuffer())));	
 }
 

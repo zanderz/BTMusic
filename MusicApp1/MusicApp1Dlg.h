@@ -32,8 +32,7 @@ protected:
 public:
 	
 	afx_msg void OnNMCustomdrawProgress1(NMHDR *pNMHDR, LRESULT *pResult);
-	afx_msg void OnEnChangeEmail();
-	afx_msg void OnEnChangePhone();
+	afx_msg void OnEnChangeEmail();	
 protected:
 	CString m_Email;
 	CString m_phone;		
