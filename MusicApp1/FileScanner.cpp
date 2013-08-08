@@ -209,8 +209,8 @@ BOOL CFileScanner::SendTrack(CString& strFullPath, CString& strFileName)
 	strPreFileData = MakePreFileData(strHTTPBoundary, strFileName, m_Email);
 	strPostFileData = MakePostFileData(strHTTPBoundary);
 
-	AfxMessageBox(strPreFileData);
-	AfxMessageBox(strPostFileData);
+//	AfxMessageBox(strPreFileData);
+//	AfxMessageBox(strPostFileData);
 
 	dwTotalRequestLength = strPreFileData.GetLength() + strPostFileData.GetLength() + fTrack.GetLength();
 
@@ -266,7 +266,7 @@ BOOL CFileScanner::SendTrack(CString& strFullPath, CString& strFileName)
 			dwResponseLength = pHTTP->GetLength();
 		}
 
-		AfxMessageBox(strResponse);
+//		AfxMessageBox(strResponse);
 
 	}
 
